@@ -1,0 +1,91 @@
+---
+title: "Mercari Price Suggestion"
+author: "Aman Adhav, Qien Song"
+output:
+    pdf_document:default
+    html_document:default
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(lubridate)
+library(ggplot2)
+library(timeSeries)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(reshape2)
+library(directlabels)
+library(data.table)
+
+```
+
+Reading Data
+```{r}
+mercari_df <- read.delim(file="train.tsv", header=TRUE)
+```
+Add broad category to help onehotencoding in the future
+```{r}
+mercari_df$general_cat <- factor(str_split_fixed(as.character(mercari_df$category_name), "/", 3)[,1])
+mercari_df$secondary_cat <- factor(paste(mercari_df$general_cat, str_split_fixed(as.character(mercari_df$category_name), "/", 3)[,2], sep = '/'))
+```
+
+General Description
+```{r}
+str(mercari_df)
+```
+```{r}
+summary(mercari_df)
+```
+
+Distribution of Item Condition
+```{r}
+boxplot(mercari_df$item_condition_id, horizontal=TRUE, main="Distribution of Item Condition")
+```
+
+Price distribution of goods less than $150
+```{r}
+hist(mercari_df[mercari_df$price < 150,]$price, freq=TRUE)
+```
+
+
+Number of Unique item in each row
+```{r}
+apply(mercari_df, 2, function(x) length(unique(x)))
+```
+
+Goods are 8 dollars more expensive if no free shipping is offered
+```{r}
+group_by_shipping = mercari_df %>% group_by(shipping) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+ggplot(group_by_shipping, aes(x = factor(shipping), y = price)) + geom_histogram(stat = 'identity')
+
+```
+
+```{r}
+group_by_category = mercari_df %>% group_by(general_cat) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+group_by_category = arrange(group_by_category, desc(price))
+ggplot(group_by_category, aes(x = general_cat, y = price)) + geom_histogram(stat = 'identity')
+```
+
+```{r}
+group_by_category
+```
+Price depending on Condition
+```{r}
+group_by_condition = mercari_df %>% group_by(item_condition_id) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+ggplot(group_by_condition, aes(x = item_condition_id, y = price)) + geom_histogram(stat = 'identity')
+```
+
+```{r}
+group_by_ship_cond = mercari_df %>% group_by(shipping, item_condition_id) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+ggplot(group_by_ship_cond, aes(x = item_condition_id, y = price)) + geom_bar(stat='identity', position ='dodge', aes(fill = factor(shipping)))
+```
+```{r}
+```
+
+```{r}
+```
+
