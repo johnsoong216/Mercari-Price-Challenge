@@ -17,6 +17,9 @@ library(stringr)
 library(reshape2)
 library(directlabels)
 library(data.table)
+library(mltools)
+library(rpart)
+library(partykit)
 
 ```
 
@@ -42,7 +45,7 @@ summary(mercari_df)
 
 Distribution of Item Condition
 ```{r}
-boxplot(mercari_df$item_condition_id, horizontal=TRUE, main="Distribution of Item Condition")
+boxplot(as.numeric(mercari_df$item_condition_id), horizontal=TRUE, main="Distribution of Item Condition")
 ```
 
 Price distribution of goods less than $150
@@ -139,7 +142,6 @@ group_by_missing
 ```
 
 ```{r}
-
 ggplot(group_by_missing,
        aes(x=general_cat, y=price)) +
   geom_bar(stat = "identity",position=position_dodge(), aes(fill = factor(missing_brand))) + coord_flip()
@@ -153,3 +155,43 @@ ggplot(group_by_missing_secondary,
   geom_bar(stat = "identity",position=position_dodge(), aes(fill = factor(missing_brand))) + coord_flip()
 
 ```
+```{r}
+#Missing Description, Missing Brand 
+group_by_missing
+```
+
+```{r}
+group_by_missing_secondary
+```
+
+```{r}
+head(mercari_df[mercari_df$general_cat == 'Beauty', ]
+```
+
+```{r}
+one_hot(as.data.table(mercari_df[1:100,]))
+```
+
+```{r}
+```
+
+```{r}
+n <- nrow(mercari_df)
+set.seed(1111)
+training_indices <- sample(1:n, size= round(0.9*n))
+train <- mercari_df[training_indices,]
+tree <- rpart(mercari_df$price ~ mercari_df$item_condition_id + mercari_df$shipping + mercari_df$missing_description + mercari_df$missing_brand, data = train, method='anova')
+plot(as.party(tree), type="simple", gp=gpar(cex=0.8))
+test <- mercari_df[-training_indices,]
+```
+
+```{r}
+predictions <- predict(object = tree, newdata = test, type = "class")
+head(predictions)
+table(predictions)
+```
+
+```{r}
+summary(tree)
+```
+
