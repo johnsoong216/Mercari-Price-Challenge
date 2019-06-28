@@ -6,9 +6,6 @@ output:
     html_document:default
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
 
 ```{r}
 library(lubridate)
@@ -26,6 +23,8 @@ library(data.table)
 Reading Data
 ```{r}
 mercari_df <- read.delim(file="train.tsv", header=TRUE)
+mercari_df$item_condition_id <- factor(mercari_df$item_condition_id)
+
 ```
 Add broad category to help onehotencoding in the future
 ```{r}
@@ -83,9 +82,74 @@ ggplot(group_by_condition, aes(x = item_condition_id, y = price)) + geom_histogr
 group_by_ship_cond = mercari_df %>% group_by(shipping, item_condition_id) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
 ggplot(group_by_ship_cond, aes(x = item_condition_id, y = price)) + geom_bar(stat='identity', position ='dodge', aes(fill = factor(shipping)))
 ```
+
+No null values
+
 ```{r}
+sapply(mercari_df, function(x) sum(x==""))
+```
+Removes all null values
+```{r}
+series <- na.omit(mercari_df$item_condition_id)
+table(series)
+```
+Item Description Analysis
+```{r}
+item_description_ana <- grep("No ", mercari_df$item_description, value=TRUE)
+head(item_description_ana)
 ```
 
 ```{r}
+null_df <- mercari_df[mercari_df$item_description == "No description yet",]
+head(null_df)
+
+boxplot(null_df$price, horizontal=TRUE, main="Distribution of Item Price for items without description")
+
+summary(null_df$price)
+
 ```
 
+```{r}
+iqr <- 15 * 1.5
+
+null_df_filtered <- null_df[null_df$price < iqr ,]
+
+boxplot(null_df_filtered$price, horizontal=TRUE, main="Distribution of Item Price for items without description and without outliers")
+```
+
+```{r}
+boxplot(mercari_df[mercari_df$price < iqr,]$price, horizontal = TRUE, freq=TRUE)
+
+summary(mercari_df$price)
+
+mercari_df$missing_description = ifelse(mercari_df$item_description == "No description yet", 1, 0)
+
+```
+
+```{r}
+
+mercari_df$missing_brand = ifelse(mercari_df$brand_name == "", 1, 0)
+
+group_by_missing = mercari_df %>% group_by(missing_description, missing_brand, general_cat) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+
+group_by_missing_secondary = mercari_df %>% group_by(missing_description, missing_brand, secondary_cat) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
+
+group_by_missing
+
+```
+
+```{r}
+
+ggplot(group_by_missing,
+       aes(x=general_cat, y=price)) +
+  geom_bar(stat = "identity",position=position_dodge(), aes(fill = factor(missing_brand))) + coord_flip()
+
+ggplot(group_by_missing,
+       aes(x=general_cat, y=price)) +
+  geom_bar(stat = "identity",position=position_dodge(), aes(fill = factor(missing_description))) + coord_flip()
+
+ggplot(group_by_missing_secondary,
+       aes(x=secondary_cat, y=price)) +
+  geom_bar(stat = "identity",position=position_dodge(), aes(fill = factor(missing_brand))) + coord_flip()
+
+```
