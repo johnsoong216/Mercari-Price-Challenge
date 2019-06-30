@@ -20,6 +20,7 @@ library(data.table)
 library(mltools)
 library(rpart)
 library(partykit)
+library(dummies)
 
 ```
 
@@ -33,6 +34,10 @@ Add broad category to help onehotencoding in the future
 ```{r}
 mercari_df$general_cat <- factor(str_split_fixed(as.character(mercari_df$category_name), "/", 3)[,1])
 mercari_df$secondary_cat <- factor(paste(mercari_df$general_cat, str_split_fixed(as.character(mercari_df$category_name), "/", 3)[,2], sep = '/'))
+mercari_df$missing_description = ifelse(mercari_df$item_description == "No description yet", 1, 0)
+mercari_df$missing_brand = ifelse(mercari_df$brand_name == "", 1, 0)
+
+
 ```
 
 General Description
@@ -131,7 +136,6 @@ mercari_df$missing_description = ifelse(mercari_df$item_description == "No descr
 
 ```{r}
 
-mercari_df$missing_brand = ifelse(mercari_df$brand_name == "", 1, 0)
 
 group_by_missing = mercari_df %>% group_by(missing_description, missing_brand, general_cat) %>% summarise_at(vars(price),funs(mean(.,na.rm=TRUE)))
 
@@ -169,7 +173,6 @@ head(mercari_df[mercari_df$general_cat == 'Beauty', ]
 ```
 
 ```{r}
-one_hot(as.data.table(mercari_df[1:100,]))
 ```
 
 ```{r}
@@ -193,5 +196,55 @@ table(predictions)
 
 ```{r}
 summary(tree)
+```
+
+```{r}
+library(randomForest)
+library(caret)
+library(e1071)
+```
+
+```{r}
+trControl <- trainControl(method = 'cv', number = 10,  search = 'grid')
+n <- nrow(mercari_df)
+set.seed(1111)
+training_indices <- sample(1:n, size= round(0.01*n))
+```
+
+```{r}
+model <- train(price ~ item_condition_id + general_cat + shipping + missing_description + missing_brand,
+    data = mercari_df[training_indices,],
+    method = "rf",
+    metric = "RMSE",
+    trControl = trControl)
+```
+
+```{r}
+names(mercari_df)
+```
+
+```{r}
+head(dummy_df)
+```
+
+```{r}
+dummy_df <- cbind(mercari_df,dummy(mercari_df$secondary_cat, sep = '_', drop = FALSE))
+dummy_df <- cbind(dummy_df,dummy(mercari_df$item_condition_id, sep = '_',  drop = FALSE))
+dummy_df <- within(dummy_df, rm(name, category_name, brand_name, secondary_cat,general_cat, item_description, train_id,item_condition_id))
+n <- nrow(dummy_df)
+set.seed(1111)
+training_indices <- sample(1:n, size= round(0.8*n))
+```
+
+```{r}
+model <- glm('price ~ .', family = gaussian, dummy_df[training_indices,])
+summary(model)
+```
+
+```{r}
+```
+
+```{r}
+cbind(predict.lm(model, dummy_df[-training_indices,]),dummy_df[-training_indices,])
 ```
 
